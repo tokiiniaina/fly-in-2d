@@ -172,7 +172,7 @@ trimmed, 256 px high). Any `drone_*.png` added to the folder is offered in
 the menu; any `.txt` map under `maps/` is listed (a parent folder named
 easy/medium/hard/challenger, or a `# Easy ...` header, gives its tag).
 
-## 3D viewer (work in progress, milestone M1)
+## 3D viewer (work in progress)
 
 `make run3d` (or `python3 fly_in.py --3d [map]`) opens an isometric 3D
 view of every valid map in `maps/`, without drones yet. It reads the same
@@ -211,8 +211,9 @@ parsed map as the rest of the project and never changes it.
   enter the play area.
 - **Code**: `viewer3d/` keeps the geometry in pure Python (`terrain.py`,
   `builders.py`, `meshbuilder.py`, `camera.py`, `palette.py`) and only
-  `scene.py` and `launcher.py` use Ursina (`environment.py` is pure too). Shading is baked in the vertex
-  colors, so it does not depend on Ursina lights or shaders.
+  `scene.py` and `launcher.py` use Ursina (`environment.py` is pure too).
+  Shading is baked in the vertex colors, so it does not depend on Ursina
+  lights or shaders.
 - `python3 -m tools.render_preview maps/02_simple_fork.txt out.png`
   makes a software preview of a map without opening a window.
 
