@@ -19,6 +19,9 @@ The project has two parts:
 
 ## Instructions
 
+For instructions on installing and running the project on Windows 10, see
+[WINDOWS_10.md](WINDOWS_10.md).
+
 ```bash
 make install     # ursina, Pillow, flake8, mypy
 make run         # opens the 2D graphical menu
