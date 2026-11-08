@@ -1,0 +1,19 @@
+# Test map: every zone type, rainbow, a custom color, capacities
+nb_drones: 3
+start_hub: start 0 0 [color=green]
+hub: a 2 0 [color=nebulous]
+hub: b 4 1 [zone=priority color=gold max_drones=2]
+hub: c 4 -1 [zone=restricted color=purple]
+hub: wall 6 0 [zone=blocked color=crimson]
+hub: d 6 2 [color=rainbow]
+hub: e 3 3
+end_hub: goal 8 1 [color=red]
+connection: start-a [max_link_capacity=2]
+connection: a-b
+connection: a-c
+connection: b-wall
+connection: c-wall
+connection: b-d
+connection: d-goal
+connection: a-e
+connection: e-d
