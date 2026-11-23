@@ -149,6 +149,42 @@ class ViewerSmokeTests(unittest.TestCase):
         screen._hud.buttons["quit"].click()
         self.assertTrue(self.ursina.application.quit_requested)
 
+    def test_map_zoom(self) -> None:
+        """Scroll and +/- zoom the map without scaling the HUD."""
+        screen = self.open_sim("02_simple_fork.txt")
+        network = screen._network
+        self.assertIsNotNone(network)
+        original_hud_root = screen._hud.root
+        screen.on_key("scroll up")
+        self.assertAlmostEqual(network.zoom, 1.1)
+        self.assertEqual(network.root.scale, (1.1, 1.1))
+        self.assertEqual(screen._hud.root.scale, original_hud_root.scale)
+        screen.on_key("minus")
+        self.assertAlmostEqual(network.zoom, 1.0)
+        for _ in range(20):
+            screen.on_key("scroll down")
+        self.assertAlmostEqual(network.zoom, 0.6)
+        for _ in range(30):
+            screen.on_key("plus")
+        self.assertAlmostEqual(network.zoom, 2.5)
+
+    def test_map_pan(self) -> None:
+        """WASD moves the map in four directions without moving the HUD."""
+        screen = self.open_sim("02_simple_fork.txt")
+        network = screen._network
+        hud_position = screen._hud.root.position
+        original_position = network.root.position
+        screen.on_key("a")
+        self.assertAlmostEqual(network.pan_x, original_position[0] - 0.06)
+        screen.on_key("d")
+        self.assertAlmostEqual(network.pan_x, 0.0)
+        screen.on_key("w")
+        self.assertAlmostEqual(network.pan_y, 0.06)
+        screen.on_key("s")
+        self.assertAlmostEqual(network.pan_y, 0.0)
+        screen.on_key("a")
+        self.assertEqual(screen._hud.root.position, hud_position)
+
     def test_speed_does_not_change_result(self) -> None:
         """All speeds replay the same backend lines."""
         screen = self.open_sim("02_circular_loop.txt")
@@ -203,6 +239,9 @@ class ViewerSmokeTests(unittest.TestCase):
     def test_resize_rebuilds_layout(self) -> None:
         """A new window shape rebuilds, keeping turn and speed."""
         screen = self.open_sim("01_maze_nightmare.txt")
+        screen.on_key("scroll up")
+        screen.on_key("a")
+        screen.on_key("w")
         screen.controller.pause()
         screen.controller.turn = 4
         screen._refresh()
@@ -211,6 +250,10 @@ class ViewerSmokeTests(unittest.TestCase):
         self.frames(0.4)
         after = screen._network.layout.positions
         self.assertNotEqual(before, after)
+        self.assertAlmostEqual(screen._network.zoom, 1.1)
+        self.assertAlmostEqual(screen._network.pan_x, -0.06)
+        self.assertAlmostEqual(screen._network.pan_y, 0.06)
+        self.assertEqual(screen._network.root.scale, (1.1, 1.1))
         self.assertEqual(screen.controller.turn, 4)
         self.assertIn("TURN: 04 / 13", texts(screen.root))
         self.ursina.window.aspect_ratio = 16 / 9

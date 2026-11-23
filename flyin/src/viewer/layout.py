@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from flyin.src.map_data import MapData
 
 MAX_VISIBLE_DRONES = 4
+ZONE_SCALE = 0.8
+CONNECTION_SCALE = 0.8
 
 
 @dataclass(frozen=True)
@@ -90,10 +92,9 @@ class NetworkLayout:
         """Height of a drone sprite."""
         return _clamp(self.node_radius * 1.7, 0.03, 0.085)
 
-    def link_width(self, capacity: int) -> float:
-        """Road width, thicker for links of higher capacity."""
-        base = self.node_radius * 0.5
-        return base * min(1.0 + 0.35 * (capacity - 1), 2.2)
+    def link_width(self) -> float:
+        """Return a fixed road width independent of connection capacity."""
+        return self.node_radius * 0.5
 
 
 def cluster_offsets(count: int, spread: float

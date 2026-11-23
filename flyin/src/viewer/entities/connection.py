@@ -13,7 +13,7 @@ from flyin.src.viewer.geometry import (
     circle_outline,
     fan,
 )
-from flyin.src.viewer.layout import NetworkLayout
+from flyin.src.viewer.layout import CONNECTION_SCALE, NetworkLayout
 from flyin.src.viewer.shapes import label, smooth_disc, tint
 
 Point = tuple[float, float]
@@ -79,11 +79,11 @@ class ConnectionLayer:
         usable: list[Segment] = []
         dead: list[Segment] = []
         outline: list[Segment] = []
-        pad = layout.node_radius * 0.28
+        pad = layout.node_radius * 0.28 * CONNECTION_SCALE
         for conn in connections:
             start = self._local(layout, conn.zone1)
             end = self._local(layout, conn.zone2)
-            width = layout.link_width(conn.max_link_capacity)
+            width = layout.link_width() * CONNECTION_SCALE
             outline.append((start, end, width + pad))
             closed = conn.zone1 in blocked or conn.zone2 in blocked
             (dead if closed else usable).append((start, end, width))
@@ -110,7 +110,7 @@ class ConnectionLayer:
         if math.hypot(ax - bx, ay - by) < layout.node_radius * 3.2:
             return
         mx, my = (ax + bx) / 2, (ay + by) / 2
-        size = layout.node_radius * 1.0
+        size = layout.node_radius * CONNECTION_SCALE
         self.badges.append(smooth_disc(self.root, mx, my, size,
                                        theme.INK_SOFT, -0.05))
         self.badges.append(

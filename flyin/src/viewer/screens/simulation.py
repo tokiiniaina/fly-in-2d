@@ -5,7 +5,11 @@ from flyin.src.viewer.adapters.simulation_adapter import (
     SimulationResult,
 )
 from flyin.src.viewer.catalog import DroneSkin, MapEntry
-from flyin.src.viewer.entities.network import NetworkView
+from flyin.src.viewer.entities.network import (
+    PAN_STEP,
+    NetworkView,
+    ZOOM_STEP,
+)
 from flyin.src.viewer.layout import Rect
 from flyin.src.viewer.playback import PlaybackController, PlaybackStatus
 from flyin.src.viewer.screens.base import Screen, ScreenHost
@@ -27,6 +31,9 @@ class SimulationScreen(Screen):
         self._network: NetworkView | None = None
         self._hud: Hud | None = None
         self._intro = True
+        self._zoom = 1.0
+        self._pan_x = 0.0
+        self._pan_y = 0.0
 
     @property
     def controller(self) -> PlaybackController:
@@ -44,6 +51,8 @@ class SimulationScreen(Screen):
         self._network = NetworkView(
             self.root, self._result.data, area, self._skin,
             session.texture(self._skin), intro=self._intro)
+        self._network.set_zoom(self._zoom)
+        self._network.set_pan(self._pan_x, self._pan_y)
         self._intro = False
         actions = HudActions(
             play=self._play, pause=self._pause, restart=self._restart,
@@ -84,9 +93,42 @@ class SimulationScreen(Screen):
             self._controller.faster()
         elif key == "down arrow":
             self._controller.slower()
+        elif key in ("scroll up", "=", "+", "plus"):
+            self._set_zoom(self._zoom * ZOOM_STEP)
+            return
+        elif key in ("scroll down", "-", "minus"):
+            self._set_zoom(self._zoom / ZOOM_STEP)
+            return
+        elif key == "a":
+            self._set_pan(self._pan_x - PAN_STEP, self._pan_y)
+            return
+        elif key == "d":
+            self._set_pan(self._pan_x + PAN_STEP, self._pan_y)
+            return
+        elif key == "w":
+            self._set_pan(self._pan_x, self._pan_y + PAN_STEP)
+            return
+        elif key == "s":
+            self._set_pan(self._pan_x, self._pan_y - PAN_STEP)
+            return
         else:
             return
         self._refresh()
+
+    def _set_zoom(self, value: float) -> None:
+        """Zoom the map while leaving the HUD fixed."""
+        if self._network is None:
+            return
+        self._network.set_zoom(value)
+        self._zoom = self._network.zoom
+
+    def _set_pan(self, x: float, y: float) -> None:
+        """Move the network while leaving the HUD fixed."""
+        if self._network is None:
+            return
+        self._network.set_pan(x, y)
+        self._pan_x = self._network.pan_x
+        self._pan_y = self._network.pan_y
 
     def _play(self) -> None:
         """PLAY: start or resume."""

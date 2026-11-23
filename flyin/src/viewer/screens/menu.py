@@ -14,6 +14,7 @@ from ursina import Entity
 
 CARD_WIDTH = 0.58
 CARD_HEIGHT = 0.90
+CARD_SCALE = 0.8
 MAX_ERROR_CHARS = 50
 SPRITE_Y = -0.175
 
@@ -35,7 +36,7 @@ class MenuScreen(Screen):
         """Draw the card, the selectors and the map preview."""
         session = self.host.session
         self._preview = None
-        scale = min(1.0, max(0.78, aspect / 1.5))
+        scale = CARD_SCALE * min(1.0, max(0.78, aspect / 1.5))
         cx = -aspect / 2 + 0.04 + CARD_WIDTH * scale / 2
         card = Entity(parent=self.root, position=(cx, 0, 0),
                       scale=(scale, scale, 1))

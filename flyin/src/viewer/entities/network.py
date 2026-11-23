@@ -25,12 +25,17 @@ from flyin.src.viewer.layout import (
     MAX_VISIBLE_DRONES,
     NetworkLayout,
     Rect,
+    ZONE_SCALE,
     cluster_offsets,
 )
 
 REVEAL_SPAN = 0.45
 ROADS_TIME = 0.5
 ARRIVAL_PULSE = 0.8
+MIN_ZOOM = 0.6
+MAX_ZOOM = 2.5
+ZOOM_STEP = 1.1
+PAN_STEP = 0.06
 
 
 class NetworkView:
@@ -49,6 +54,9 @@ class NetworkView:
         """Draw the network inside `area`."""
         self.root = Entity(parent=parent)
         self.layout = NetworkLayout(data, area)
+        self.zoom = 1.0
+        self.pan_x = 0.0
+        self.pan_y = 0.0
         layout = self.layout
         self._intro = intro
         self._clock = 0.0
@@ -65,7 +73,8 @@ class NetworkView:
                 kind = "end"
             x, y = layout.positions[name]
             self.zones[name] = ZoneView(
-                self.root, name, kind, x, y, layout.node_radius,
+                self.root, name, kind, x, y,
+                layout.node_radius * ZONE_SCALE,
                 zone.color, zone.max_drones, layout.name_fits(name))
         if intro:
             self._start_intro()
@@ -77,6 +86,27 @@ class NetworkView:
                     layout.drone_height)
         self.animator = DroneAnimator()
         self._placed = False
+
+    def set_zoom(self, value: float) -> None:
+        """Zoom the complete network around the center of its drawing area."""
+        self.zoom = max(MIN_ZOOM, min(value, MAX_ZOOM))
+        self._apply_transform()
+
+    def set_pan(self, x: float, y: float) -> None:
+        """Move the network without moving the screen controls."""
+        self.pan_x = x
+        self.pan_y = y
+        self._apply_transform()
+
+    def _apply_transform(self) -> None:
+        """Apply zoom around the area center and the current pan offset."""
+        area = self.layout.area
+        self.root.position = (
+            area.cx * (1.0 - self.zoom) + self.pan_x,
+            area.cy * (1.0 - self.zoom) + self.pan_y,
+            0.0,
+        )
+        self.root.scale = (self.zoom, self.zoom)
 
     def _start_intro(self) -> None:
         """Schedule the wave: zones far from the center come last."""
