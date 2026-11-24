@@ -1,7 +1,7 @@
 """Validate a simulator output independently from the simulator."""
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from flyin.src.map_data import MapData
 
@@ -13,6 +13,15 @@ class DroneState:
     zone: str | None
     flying_from: str | None = None
     flying_to: str | None = None
+
+
+@dataclass
+class TurnUsage:
+    """Track link use and zone movement during one turn."""
+
+    link_usage: Counter[frozenset[str]] = field(default_factory=Counter)
+    departures: Counter[str] = field(default_factory=Counter)
+    arrivals: Counter[str] = field(default_factory=Counter)
 
 
 class OutputChecker:
@@ -52,9 +61,7 @@ class OutputChecker:
         """Validate one turn and update all drone states."""
         moves = self._parse_line(turn, line)
         zone_occupancy = self._current_occupancy()
-        link_usage: Counter[frozenset[str]] = Counter()
-        departures: Counter[str] = Counter()
-        arrivals: Counter[str] = Counter()
+        usage = TurnUsage()
         next_states = {
             drone_id: DroneState(
                 zone=state.zone,
@@ -79,8 +86,7 @@ class OutputChecker:
                     state,
                     destination,
                     next_states[drone_id],
-                    link_usage,
-                    arrivals,
+                    usage,
                 )
                 continue
 
@@ -95,19 +101,12 @@ class OutputChecker:
                 state,
                 destination,
                 next_states[drone_id],
-                link_usage,
-                departures,
-                arrivals,
+                usage,
             )
 
         self._check_waiting_drones(turn, moves, next_states)
-        self._check_zone_capacities(
-            turn,
-            zone_occupancy,
-            departures,
-            arrivals,
-        )
-        self._check_link_capacities(turn, link_usage)
+        self._check_zone_capacities(turn, zone_occupancy, usage)
+        self._check_link_capacities(turn, usage)
         self._states = next_states
 
     def _parse_line(self, turn: int, line: str) -> dict[int, str]:
@@ -149,8 +148,7 @@ class OutputChecker:
         state: DroneState,
         destination: str,
         next_state: DroneState,
-        link_usage: Counter[frozenset[str]],
-        arrivals: Counter[str],
+        usage: TurnUsage,
     ) -> None:
         """Validate the mandatory second turn of a restricted flight."""
         if destination != state.flying_to:
@@ -162,8 +160,8 @@ class OutputChecker:
         assert state.flying_from is not None
         assert state.flying_to is not None
         key = frozenset((state.flying_from, state.flying_to))
-        link_usage[key] += 1
-        arrivals[state.flying_to] += 1
+        usage.link_usage[key] += 1
+        usage.arrivals[state.flying_to] += 1
 
         next_state.zone = state.flying_to
         next_state.flying_from = None
@@ -176,9 +174,7 @@ class OutputChecker:
         state: DroneState,
         destination: str,
         next_state: DroneState,
-        link_usage: Counter[frozenset[str]],
-        departures: Counter[str],
-        arrivals: Counter[str],
+        usage: TurnUsage,
     ) -> None:
         """Validate an ordinary move or a restricted-zone takeoff."""
         assert state.zone is not None
@@ -203,8 +199,8 @@ class OutputChecker:
 
         self._check_connection(turn, drone_id, source, target)
         key = frozenset((source, target))
-        link_usage[key] += 1
-        departures[source] += 1
+        usage.link_usage[key] += 1
+        usage.departures[source] += 1
 
         target_zone = self._data.zones[target]
         if "-" in destination:
@@ -223,7 +219,7 @@ class OutputChecker:
                 f"'{source}-{target}'"
             )
 
-        arrivals[target] += 1
+        usage.arrivals[target] += 1
         next_state.zone = target
 
     def _check_connection(
@@ -285,8 +281,7 @@ class OutputChecker:
         self,
         turn: int,
         occupancy: Counter[str],
-        departures: Counter[str],
-        arrivals: Counter[str],
+        usage: TurnUsage,
     ) -> None:
         """Check zone capacity after departures and arrivals."""
         for name, zone in self._data.zones.items():
@@ -294,7 +289,8 @@ class OutputChecker:
                 continue
 
             final_count = (
-                occupancy[name] - departures[name] + arrivals[name]
+                occupancy[name] - usage.departures[name]
+                + usage.arrivals[name]
             )
             if final_count > zone.max_drones:
                 raise ValueError(
@@ -305,10 +301,10 @@ class OutputChecker:
     def _check_link_capacities(
         self,
         turn: int,
-        link_usage: Counter[frozenset[str]],
+        usage: TurnUsage,
     ) -> None:
         """Check shared link capacities for both movement directions."""
-        for link, count in link_usage.items():
+        for link, count in usage.link_usage.items():
             capacity = self._link_capacities[link]
             if count > capacity:
                 endpoints = "-".join(sorted(link))
