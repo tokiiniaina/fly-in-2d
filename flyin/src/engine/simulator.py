@@ -72,53 +72,74 @@ class Simulator:
 
     def _play_turn(self) -> list[str]:
         """Play one turn and return the movements as text."""
-        moves: list[str] = []
         links: Counter[frozenset[str]] = Counter()
-        landed: set[int] = set()
+        landed = self._land_flying_drones(links)
+        moves = [f"D{d.drone_id}-{d.zone}" for d in landed]
+        moves.extend(self._move_waiting_drones(
+            links, {d.drone_id for d in landed}))
+        return moves
+
+    def _land_flying_drones(
+            self, links: Counter[frozenset[str]]) -> list[Drone]:
+        """Land every drone in flight (its landing still uses the link)."""
+        landed: list[Drone] = []
         for drone in self._drones:
-            if drone.flying_to is not None and drone.flying_from:
-                key = frozenset((drone.flying_from, drone.flying_to))
-                links[key] += 1
-                drone.zone = drone.flying_to
-                drone.flying_from = drone.flying_to = None
-                if self._is_limited(drone.zone):
-                    self._incoming[drone.zone] -= 1
-                    self._inside[drone.zone] += 1
-                landed.add(drone.drone_id)
-                moves.append(f"D{drone.drone_id}-{drone.zone}")
+            if drone.flying_to is None or not drone.flying_from:
+                continue
+            key = frozenset((drone.flying_from, drone.flying_to))
+            links[key] += 1
+            drone.zone = drone.flying_to
+            drone.flying_from = drone.flying_to = None
+            if self._is_limited(drone.zone):
+                self._incoming[drone.zone] -= 1
+                self._inside[drone.zone] += 1
+            landed.append(drone)
+        return landed
+
+    def _move_waiting_drones(self, links: Counter[frozenset[str]],
+                             landed: set[int]) -> list[str]:
+        """Move the drones that can, the closest to the goal first."""
         waiting = [d for d in self._drones if not self._delivered(d)
                    and d.zone != self._end and d.flying_to is None
                    and d.drone_id not in landed]
         waiting.sort(key=lambda d: (self._dist.to_end(d.zone) or 0,
                                     d.drone_id))
+        moves: list[str] = []
         for drone in waiting:
             target = self._choose(drone, links)
             if target is not None:
                 moves.append(self._move(drone, target, links))
         return moves
 
+    def _score(self, src: str, nxt: str,
+               dist: int) -> tuple[int, int, int, str]:
+        """Rank a candidate move (lower is better).
+
+        Order: turns to the goal, priority zone first, wider capacity,
+        then the zone name to stay deterministic.
+        """
+        kind = self._data.zones[nxt].zone_type
+        capacity = self._link_cap[frozenset((src, nxt))]
+        if self._is_limited(nxt):
+            capacity = min(capacity, self._data.zones[nxt].max_drones)
+        return (ENTRY_COST[kind] + dist,
+                0 if kind == "priority" else 1, -capacity, nxt)
+
     def _choose(self, drone: Drone,
                 links: Counter[frozenset[str]]) -> str | None:
         """Best neighbor that is closer to the end and has room."""
         here = self._dist.to_end(drone.zone)
+        if here is None:
+            return None
         best: tuple[int, int, int, str] | None = None
         for nxt in self._neighbors[drone.zone]:
             dist = self._dist.to_end(nxt)
-            kind = self._data.zones[nxt].zone_type
-            if dist is None or here is None or dist >= here:
+            if dist is None or dist >= here:
                 continue
             key = frozenset((drone.zone, nxt))
-            if links[key] >= self._link_cap[key]:
+            if links[key] >= self._link_cap[key] or not self._can_enter(nxt):
                 continue
-            if not self._can_enter(nxt):
-                continue
-            capacity = self._link_cap[key]
-            if self._is_limited(nxt):
-                capacity = min(
-                    capacity, self._data.zones[nxt].max_drones
-                )
-            score = (ENTRY_COST[kind] + dist,
-                     0 if kind == "priority" else 1, -capacity, nxt)
+            score = self._score(drone.zone, nxt, dist)
             if best is None or score < best:
                 best = score
         return None if best is None else best[3]
