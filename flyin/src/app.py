@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from flyin.src.engine.checker import OutputChecker
 from flyin.src.engine.simulator import Simulator
 from flyin.src.map_data import MapData
 from flyin.src.parser_function import MapParser
@@ -85,6 +86,7 @@ class Application:
         try:
             data = MapParser().parse(args.map)
             lines = Simulator(data).run()
+            OutputChecker(data).check(lines)
         except OSError as error:
             print(f"Error: cannot read '{error.filename}'",
                   file=sys.stderr)
