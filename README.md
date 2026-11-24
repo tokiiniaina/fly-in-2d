@@ -87,9 +87,10 @@ land on the next turn.
 4. **Validation**: `engine/checker.py` (`OutputChecker`) replays an output
    independently and checks every rule.
 
-The repository also contains a space-time A* planner
-(`engine/scheduler.py`, `reservations.py`, `simulation.py`); the command
-line and the viewer use the `Simulator` above.
+Limit: a drone only moves to a neighbor strictly closer to the goal, so
+it follows shortest-path edges and never takes a longer parallel route,
+even when the short one is saturated. It also never deadlocks, because
+distances to the goal strictly decrease along every move.
 
 Measured turns with the provided maps:
 
@@ -242,7 +243,7 @@ simulation.
 ## Resources
 
 - Ursina Engine documentation: https://www.ursinaengine.org/
-- Dijkstra's algorithm, space-time A* (cooperative pathfinding) articles.
+- Dijkstra's algorithm articles.
 - Python `typing`, PEP 257, flake8 and mypy documentation.
 
 **AI usage**: the viewer (`flyin/src/viewer`), the tests, the Makefile and
