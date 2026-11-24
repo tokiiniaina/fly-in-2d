@@ -41,8 +41,9 @@ class Simulator:
             self._link_name[key] = f"{c.zone1}-{c.zone2}"
             self._neighbors[c.zone1].append(c.zone2)
             self._neighbors[c.zone2].append(c.zone1)
-        self._inside: Counter[str] = Counter()
-        self._incoming: Counter[str] = Counter()
+        # Drones inside a zone plus drones flying towards it: the slot
+        # is taken at take-off and released when the drone leaves.
+        self._held: Counter[str] = Counter()
 
     def _is_limited(self, zone: str) -> bool:
         """Start and end have no capacity limit."""
@@ -56,8 +57,7 @@ class Simulator:
         """Whether the zone still has room."""
         if not self._is_limited(zone):
             return True
-        used = self._inside[zone] + self._incoming[zone]
-        return used < self._data.zones[zone].max_drones
+        return self._held[zone] < self._data.zones[zone].max_drones
 
     def run(self) -> list[str]:
         """Simulate until every drone is delivered."""
@@ -90,9 +90,6 @@ class Simulator:
             links[key] += 1
             drone.zone = drone.flying_to
             drone.flying_from = drone.flying_to = None
-            if self._is_limited(drone.zone):
-                self._incoming[drone.zone] -= 1
-                self._inside[drone.zone] += 1
             landed.append(drone)
         return landed
 
@@ -150,14 +147,12 @@ class Simulator:
         key = frozenset((drone.zone, target))
         links[key] += 1
         if self._is_limited(drone.zone):
-            self._inside[drone.zone] -= 1
+            self._held[drone.zone] -= 1
+        if self._is_limited(target):
+            self._held[target] += 1
         if self._data.zones[target].zone_type == "restricted":
             drone.flying_from, drone.flying_to = drone.zone, target
-            if self._is_limited(target):
-                self._incoming[target] += 1
             return f"D{drone.drone_id}-{self._link_name[key]}"
-        if self._is_limited(target):
-            self._inside[target] += 1
         drone.zone = target
 
         return f"D{drone.drone_id}-{target}"
