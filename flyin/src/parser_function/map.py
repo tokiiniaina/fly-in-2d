@@ -20,11 +20,6 @@ class MapParser:
         return _parse_map(file_path)
 
 
-def parse_map(file_path: str) -> MapData:
-    """Keep the original functional parser API for compatibility."""
-    return MapParser().parse(file_path)
-
-
 def _parse_map(file_path: str) -> MapData:
     """Parse the drone count and zones from a map file."""
     lines = read_lines(file_path)
