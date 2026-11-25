@@ -32,6 +32,7 @@ class CheckerRejectsTests(unittest.TestCase):
         *,
         a_capacity: int = 2,
         s_a_capacity: int = 2,
+        expected_message: str | None = None,
     ) -> None:
         """Parse a temporary map and assert its output is rejected."""
         with tempfile.TemporaryDirectory() as folder:
@@ -45,8 +46,10 @@ class CheckerRejectsTests(unittest.TestCase):
             )
             data = MapParser().parse(str(path))
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as error:
             OutputChecker(data).check(lines)
+        if expected_message is not None:
+            self.assertIn(expected_message, str(error.exception))
 
     def test_unknown_drone(self) -> None:
         self.assert_rejected(["D3-a"])
@@ -59,6 +62,12 @@ class CheckerRejectsTests(unittest.TestCase):
 
     def test_zones_must_be_connected(self) -> None:
         self.assert_rejected(["D1-x"])
+
+    def test_unknown_zone_is_rejected(self) -> None:
+        self.assert_rejected(
+            ["D1-unknown"],
+            expected_message="enters unknown zone 'unknown'",
+        )
 
     def test_blocked_zone_cannot_be_entered(self) -> None:
         self.assert_rejected(["D1-b"])
@@ -77,6 +86,12 @@ class CheckerRejectsTests(unittest.TestCase):
 
     def test_restricted_zone_requires_flight_token(self) -> None:
         self.assert_rejected(["D1-r"])
+
+    def test_flight_token_cannot_target_a_normal_zone(self) -> None:
+        self.assert_rejected(
+            ["D1-s-a"],
+            expected_message="only restricted zones use a flight token",
+        )
 
     def test_restricted_flight_must_land_next_turn(self) -> None:
         self.assert_rejected(["D1-s-r", ""])

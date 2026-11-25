@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from flyin.src.map_data import MapData
 
 
+def _link_key(zone1: str, zone2: str) -> tuple[str, str]:
+    """Return one consistent key for a link, regardless of direction."""
+    return min(zone1, zone2), max(zone1, zone2)
+
+
 @dataclass
 class DroneState:
     """Store the current state of one drone."""
@@ -19,7 +24,7 @@ class DroneState:
 class TurnUsage:
     """Track link use and zone movement during one turn."""
 
-    link_usage: Counter[frozenset[str]] = field(default_factory=Counter)
+    link_usage: Counter[tuple[str, str]] = field(default_factory=Counter)
     departures: Counter[str] = field(default_factory=Counter)
     arrivals: Counter[str] = field(default_factory=Counter)
 
@@ -42,10 +47,10 @@ class OutputChecker:
         self._neighbors: dict[str, set[str]] = {
             name: set() for name in data.zones
         }
-        self._link_capacities: dict[frozenset[str], int] = {}
+        self._link_capacities: dict[tuple[str, str], int] = {}
 
         for connection in data.connections:
-            key = frozenset((connection.zone1, connection.zone2))
+            key = _link_key(connection.zone1, connection.zone2)
             self._neighbors[connection.zone1].add(connection.zone2)
             self._neighbors[connection.zone2].add(connection.zone1)
             self._link_capacities[key] = connection.max_link_capacity
@@ -62,17 +67,17 @@ class OutputChecker:
         moves = self._parse_line(turn, line)
         zone_occupancy = self._current_occupancy()
         usage = TurnUsage()
-        next_states = {
-            drone_id: DroneState(
+        next_states: dict[int, DroneState] = {}
+        for drone_id, state in self._states.items():
+            next_states[drone_id] = DroneState(
                 zone=state.zone,
                 flying_from=state.flying_from,
                 flying_to=state.flying_to,
             )
-            for drone_id, state in self._states.items()
-        }
 
         for drone_id, destination in moves.items():
             state = self._states[drone_id]
+            next_state = next_states[drone_id]
 
             if state.zone == self._end:
                 raise ValueError(
@@ -85,7 +90,7 @@ class OutputChecker:
                     drone_id,
                     state,
                     destination,
-                    next_states[drone_id],
+                    next_state,
                     usage,
                 )
                 continue
@@ -100,7 +105,7 @@ class OutputChecker:
                 drone_id,
                 state,
                 destination,
-                next_states[drone_id],
+                next_state,
                 usage,
             )
 
@@ -159,7 +164,7 @@ class OutputChecker:
 
         assert state.flying_from is not None
         assert state.flying_to is not None
-        key = frozenset((state.flying_from, state.flying_to))
+        key = _link_key(state.flying_from, state.flying_to)
         usage.link_usage[key] += 1
         usage.arrivals[state.flying_to] += 1
 
@@ -177,42 +182,45 @@ class OutputChecker:
         usage: TurnUsage,
     ) -> None:
         """Validate an ordinary move or a restricted-zone takeoff."""
-        assert state.zone is not None
-
         if "-" in destination:
-            parts = destination.split("-")
-            if len(parts) != 2:
-                raise ValueError(
-                    f"turn {turn}: invalid restricted move "
-                    f"'D{drone_id}-{destination}'"
-                )
-            if state.zone not in parts:
-                raise ValueError(
-                    f"turn {turn}: D{drone_id} is not in "
-                    f"'{parts[0]}' nor '{parts[1]}'"
-                )
-            source = state.zone
-            target = parts[1] if parts[0] == source else parts[0]
-        else:
-            source = state.zone
-            target = destination
+            self._check_restricted_departure(
+                turn,
+                drone_id,
+                state,
+                destination,
+                next_state,
+                usage,
+            )
+            return
 
+        self._check_normal_departure(
+            turn,
+            drone_id,
+            state,
+            destination,
+            next_state,
+            usage,
+        )
+
+    def _check_normal_departure(
+        self,
+        turn: int,
+        drone_id: int,
+        state: DroneState,
+        target: str,
+        next_state: DroneState,
+        usage: TurnUsage,
+    ) -> None:
+        """Validate a direct move that does not use a flight token."""
+        assert state.zone is not None
+        source = state.zone
         self._check_connection(turn, drone_id, source, target)
-        key = frozenset((source, target))
+
+        key = _link_key(source, target)
         usage.link_usage[key] += 1
         usage.departures[source] += 1
 
         target_zone = self._data.zones[target]
-        if "-" in destination:
-            if target_zone.zone_type != "restricted":
-                raise ValueError(
-                    f"turn {turn}: only restricted zones use a flight token"
-                )
-            next_state.zone = None
-            next_state.flying_from = source
-            next_state.flying_to = target
-            return
-
         if target_zone.zone_type == "restricted":
             raise ValueError(
                 f"turn {turn}: restricted move must include "
@@ -221,6 +229,50 @@ class OutputChecker:
 
         usage.arrivals[target] += 1
         next_state.zone = target
+
+    def _check_restricted_departure(
+        self,
+        turn: int,
+        drone_id: int,
+        state: DroneState,
+        flight_token: str,
+        next_state: DroneState,
+        usage: TurnUsage,
+    ) -> None:
+        """Validate the flight token used to enter a restricted zone."""
+        assert state.zone is not None
+        parts = flight_token.split("-")
+        if len(parts) != 2:
+            raise ValueError(
+                f"turn {turn}: invalid restricted move "
+                f"'D{drone_id}-{flight_token}'"
+            )
+        if state.zone not in parts:
+            raise ValueError(
+                f"turn {turn}: D{drone_id} is not in "
+                f"'{parts[0]}' nor '{parts[1]}'"
+            )
+
+        source = state.zone
+        if parts[0] == source:
+            target = parts[1]
+        else:
+            target = parts[0]
+
+        self._check_connection(turn, drone_id, source, target)
+        target_zone = self._data.zones[target]
+        if target_zone.zone_type != "restricted":
+            raise ValueError(
+                f"turn {turn}: only restricted zones use a flight token"
+            )
+
+        key = _link_key(source, target)
+        usage.link_usage[key] += 1
+        usage.departures[source] += 1
+
+        next_state.zone = None
+        next_state.flying_from = source
+        next_state.flying_to = target
 
     def _check_connection(
         self,
@@ -289,8 +341,7 @@ class OutputChecker:
                 continue
 
             final_count = (
-                occupancy[name] - usage.departures[name]
-                + usage.arrivals[name]
+                occupancy[name] - usage.departures[name] + usage.arrivals[name]
             )
             if final_count > zone.max_drones:
                 raise ValueError(
@@ -307,7 +358,7 @@ class OutputChecker:
         for link, count in usage.link_usage.items():
             capacity = self._link_capacities[link]
             if count > capacity:
-                endpoints = "-".join(sorted(link))
+                endpoints = "-".join(link)
                 raise ValueError(
                     f"turn {turn}: link '{endpoints}' carries "
                     f"{count} drones, maximum is {capacity}"
