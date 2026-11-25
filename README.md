@@ -20,9 +20,8 @@ The project has two parts:
 ## Instructions
 
 ```bash
-make install     # ursina, Pillow, flake8, mypy
+make install     # Ursina, Pillow, flake8, mypy
 make run         # opens the 2D graphical menu
-make run3d       # opens the isometric 3D viewer (milestone M1)
 make cli MAP=maps/02_simple_fork.txt   # terminal output only
 make test        # unit + viewer smoke tests
 make lint        # flake8 + mypy (flags required by the subject)
@@ -53,6 +52,8 @@ Python 3.10+ is required.
 | HUD | QUIT | close the application |
 | Keys | space, R, esc | play/pause, restart, back to the menu |
 | Keys | left/right, up/down | step a turn (animated), speed (sim) / map, drone (menu) |
+| Map | W / A / S / D | move the map up / left / down / right (HUD stays fixed) |
+| Map | mouse wheel up / down | zoom in / out on the map |
 
 ## Example
 
@@ -72,7 +73,7 @@ land on the next turn.
 
 ## Algorithm (backend, unchanged)
 
-`Application` runs `MapParser` then `Simulator`.
+`CliApplication` runs `MapParser` then `Simulator`.
 
 1. **Parsing** (`parser_function/`): strict, with line-numbered errors
    (types, capacities, duplicates, unknown zones...).
@@ -169,76 +170,6 @@ the backend moves are *shown*; speed never changes the result.
 trimmed, 256 px high). Any `drone_*.png` added to the folder is offered in
 the menu; any `.txt` map under `maps/` is listed (a parent folder named
 easy/medium/hard/challenger, or a `# Easy ...` header, gives its tag).
-
-## 3D viewer
-
-`make run3d` (or `python3 fly_in.py --3d [map]`) opens the isometric 3D
-game. Pick a map with the arrows (or the left/right keys) and press PLAY
-(or ENTER): the backend runs on the map and the drones fly the real
-simulation.
-
-| Where | Key / button | Action |
-|-------|--------------|--------|
-| map view | `<` `>` / arrow keys | previous / next map |
-| map view | PLAY / ENTER | run the simulation |
-| simulation | PLAY, PAUSE, RESTART | resume / freeze / run the backend again |
-| simulation | SPEED - + (or up/down) | 0.25x to 8x (pace only) |
-| simulation | MAP / ESC | back to the map view |
-| simulation | left / right arrow | step one turn |
-| both | Q / E, mouse wheel, V | rotate 90 degrees (smooth), zoom, reset view |
-| both | QUIT / ESC (map view) | quit |
-
-- **Exact graph**: one pad per zone at its map coordinates (times 2), one
-  cobblestone path per real connection and nothing else. Wider
-  `max_link_capacity` gives a wider path; a link touching a blocked zone
-  is drawn closed (grey).
-- **Capacities are visible**: a regular zone shows one glowing pip per
-  drone it can hold (up to 8; start and end are unlimited and show none),
-  and a link of capacity N shows N - 1 lane marks on its path.
-- **Feedback**: a pad bumps when a drone lands on it (more at the goal).
-  At the end of a run a panel shows whether all drones were delivered,
-  the number of turns against the subject target of the map, and the
-  `OUTPUT: VALID` check. The map view shows the target too.
-- **Zone types** (shape) and **colors** (from the map file) are separate:
-  normal is a rounded pad, priority is taller with a gold ring and star,
-  restricted is low with hazard stripes, blocked is a stone block with a
-  crossed barrier, start and end carry a flag. `color=` gives the pad
-  color, `rainbow` gives a multicolored top, and an unknown color word
-  keeps its own stable color. Grass is only tinted slightly toward the
-  map colors.
-- **Terrain**: continuous ground around the graph, small plateaus with
-  cliffs, and a few floating islets that are decor only (no pad, no path).
-  The ground has a galactic look (dark blue tiles, glowing cyan rim, rock
-  cliffs, metal plates for paths, star dust specks). There is no
-  vegetation: only asteroid rocks and crystals. Decor is seeded by the
-  map name, so a map always looks the same.
-- **Space environment** (static, not animated): a nebula image fixed to
-  the camera (`assets/background/space.jpg`, rebuilt with
-  `python3 -m tools.make_space_background`), 3D stars scattered around
-  the islands (they shift when the view rotates), and translucent
-  low-poly smoke under and beside the islands. Stars and smoke never
-  enter the play area.
-- **Drones**: a 3D model built from primitives after the reference image
-  (white rounded body, big eye with a blue glowing ring, antenna, jointed
-  arms with claws, blue thruster). Each drone is animated independently
-  and procedurally (`drone_rig.py`): hover bob, small wobbles, forward
-  tilt and banking while flying, arm swing, blinking, exhaust flame and
-  discreet sparks, smooth acceleration and braking, and a spin, jump and
-  confetti when it reaches the goal. The drone size follows the pad size.
-- **Synchronization**: positions come from the Timeline built from the
-  lines the existing `Simulator` printed (the same as the CLI), so the
-  drones are exactly where the backend says after each turn. A drone
-  flying to a restricted zone hovers on the connection for its turn.
-  Speed changes only how long a turn stays on screen.
-- **Code**: `viewer3d/` keeps the geometry in pure Python (`terrain.py`,
-  `builders.py`, `meshbuilder.py`, `camera.py`, `palette.py`) and only
-  `scene.py`, `drone_actor.py`, `simulation3d.py` and `launcher.py` use Ursina; the
-  drone model, rig and layout are pure. Shading is baked in the vertex
-  colors, so it does not depend on Ursina lights or shaders.
-- `python3 -m tools.render_preview maps/02_simple_fork.txt out.png 45 2`
-  makes a software preview of a map (here with the drones of turn 2),
-  and `python3 -m tools.render_drone out.png` a close-up of the drone,
-  without opening a window.
 
 ## Resources
 

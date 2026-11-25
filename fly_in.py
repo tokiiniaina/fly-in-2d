@@ -2,8 +2,8 @@
 
 import sys
 
-from flyin.src.app import Application
+from flyin.src.app import CliApplication
 
 if __name__ == "__main__":
 
-    sys.exit(Application().run())
+    sys.exit(CliApplication().run())

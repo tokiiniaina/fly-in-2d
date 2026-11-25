@@ -58,9 +58,20 @@ class OutputChecker:
     def check(self, lines: list[str]) -> None:
         """Replay all lines and raise ValueError for an invalid output."""
         for turn, line in enumerate(lines, start=1):
+            # No turns are allowed after all drones have arrived.
+            if all(
+                state.zone == self._end
+                for state in self._states.values()
+            ):
+                raise ValueError(
+                    f"turn {turn}: simulation continues after all drones "
+                    "were delivered"
+                )
+
             self._check_turn(turn, line)
 
         self._check_delivery(len(lines))
+
 
     def _check_turn(self, turn: int, line: str) -> None:
         """Validate one turn and update all drone states."""
