@@ -13,7 +13,7 @@ def parse_connection(
     line = line.strip()
 
     match = re.fullmatch(
-        r"connection:\s*([^\s\-\[\]]+)-([^\s\-\[\]]+)(?:\s+(.*))?",
+        r"connection:\s*([^\s\-]+)-([^\s\-]+)(?:\s+(.*))?",
         line,
     )
 
@@ -42,6 +42,21 @@ def parse_connection(
             )
 
         metadata_text = metadata_block[1:-1].strip()
+
+        metadata_keys = re.findall(r"([a-z_]+)\s*=", metadata_text)
+        if len(metadata_keys) != len(set(metadata_keys)):
+            raise ValueError(
+                f"Line {line_number}: duplicate connection metadata"
+            )
+
+        unknown_keys = [
+            key for key in metadata_keys if key != "max_link_capacity"
+        ]
+        if unknown_keys:
+            raise ValueError(
+                f"Line {line_number}: unknown connection metadata "
+                f"'{unknown_keys[0]}'"
+            )
 
         metadata_match = re.fullmatch(
             r"max_link_capacity\s*=\s*([^\s=\[\]]+)",

@@ -97,7 +97,7 @@ def parse_zone(line: str, line_number: int) -> tuple[str, Zone]:
                 f"Line {line_number}: invalid zone type '{zone_type}'"
             )
 
-        if prefix == "hub" and "max_drones" in metadata:
+        if "max_drones" in metadata:
             value = metadata["max_drones"]
 
             if not value.isascii() or not value.isdigit():
@@ -106,12 +106,15 @@ def parse_zone(line: str, line_number: int) -> tuple[str, Zone]:
                     "be a positive integer"
                 )
 
-            max_drones = int(value)
+            capacity = int(value)
 
-            if max_drones <= 0:
+            if capacity <= 0:
                 raise ValueError(
                     f"Line {line_number}: max_drones must be positive"
                 )
+
+            if prefix == "hub":
+                max_drones = capacity
 
     zone = Zone(
         name=name,

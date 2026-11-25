@@ -1,16 +1,13 @@
 PYTHON ?= python3
 MAP ?= maps/02_simple_fork.txt
 
-.PHONY: install run run3d cli debug test clean lint lint-strict
+.PHONY: install run cli debug test clean lint lint-strict
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 run:
 	$(PYTHON) fly_in.py
-
-run3d:
-	$(PYTHON) fly_in.py --3d
 
 cli:
 	$(PYTHON) fly_in.py $(MAP)
